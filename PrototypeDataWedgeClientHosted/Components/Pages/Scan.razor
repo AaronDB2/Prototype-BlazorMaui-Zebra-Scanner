@@ -1,0 +1,59 @@
+﻿@page "/scan"
+
+<h3>Scan</h3>
+<div>
+    <p>This page contains all the scan information and functionality. This page can only be used on a Zebra device with a barcode scanner</p>
+    <button disabled="@isDisabled" @onclick="ActivateScanner" type="button">Scan</button>
+    <h3>@data</h3>
+</div>
+
+@code {
+    private bool isDisabled = false;
+    private bool startScanner = false;
+    private CancellationTokenSource tokenSource = new CancellationTokenSource();
+    private string data = String.Empty;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        WeakReferenceMessenger.Default.Register<string>(this, (r, li) =>
+            {
+                MainThread.BeginInvokeOnMainThread(() =>
+                {
+                    if (li.Split(":")[0] == "Data from scan")
+                    {
+                        data = li.Split(":")[1];
+
+                        // Cancel the scan delay
+                        tokenSource.Cancel();
+                    }
+
+                });
+            });
+    }
+
+    private async Task ActivateScanner(EventArgs e)
+    {
+        if (!startScanner)
+        {
+            isDisabled = true;
+            startScanner = true;
+            WeakReferenceMessenger.Default.Send("11");
+            try
+            {
+                await Task.Delay(6000, tokenSource.Token);
+                isDisabled = false;
+                startScanner = false;
+            } 
+            catch (Exception error) 
+            {
+                isDisabled = false;
+                startScanner = false;
+
+                // Dispose the old token and create a new one
+                tokenSource.Dispose();
+                tokenSource = new CancellationTokenSource();
+            }
+        }
+    }
+}
